@@ -21,6 +21,7 @@ Ext.define('CustomApp', {
       xtype: 'rallycombobox',
       editable: false,
       width: 400,
+      defaultSelectionPosition: null,
       storeConfig: {
         limit: Infinity,
         autoLoad: true,
