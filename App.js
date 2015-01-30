@@ -97,6 +97,10 @@ Ext.define('CustomApp', {
       model: 'PortfolioItem/ProgramComponent',
       fetch: ['Children'],
       filters: filters,
+      sorters: [{
+        property: 'Name',
+        direction: 'ASC'
+      }],
       listeners: {
         load: function(store, records) {
           if (records.length > 0) {
@@ -122,7 +126,6 @@ Ext.define('CustomApp', {
                   isMatchingRecord: function(cardRecord) {
                     return _.contains(programComponentRecord.get('Children'), cardRecord.get('Feature').ObjectID);
                   },
-                  value: programComponentRecord.getRef().getRelativeUri(),
                   columnHeaderConfig: {
                     headerData: {
                       programComponent: programComponentRecord.get('_refObjectName')
@@ -133,7 +136,8 @@ Ext.define('CustomApp', {
             });
           } else {
             Rally.ui.notify.Notifier.showError({
-              message: 'No User Stories match your criteria.'
+              message: 'No User Stories match your criteria.',
+              timeout: 2000
             });
           }
         }
@@ -144,12 +148,14 @@ Ext.define('CustomApp', {
   },
 
   _createCardboard: function(columnConfigs) {
+    var deferred = Ext.create('Deft.Deferred');
+
     Ext.getCmp('app-viewport').add({
       xtype: 'rallycardboard',
       id: 'cardboard',
       hidden: true,
       context: this.getContext(),
-      types: ['UserStory'],
+      readOnly: true,
       columns: columnConfigs,
       rowConfig: {
         field: 'Project'
@@ -161,8 +167,15 @@ Ext.define('CustomApp', {
         columnHeaderConfig: {
           headerTpl: '{programComponent}'
         }
+      },
+      listeners: {
+        afterrender: function() {
+          deferred.resolve();
+        }
       }
     });
+
+    return deferred.promise;
   },
 
   _getCards: function() {
@@ -185,8 +198,27 @@ Ext.define('CustomApp', {
       autoLoad: true,
       limit: Infinity,
       model: 'UserStory',
-      fetch: ['Feature', 'Parent', 'Project', 'Name', 'Owner', 'FormattedID', 'ObjectID', 'ScheduleState'],
+      fetch: [
+        'Feature',
+        'FormattedID',
+        'Name',
+        'ObjectID',
+        'Owner',
+        'Parent',
+        'Project',
+        'ScheduleState'
+      ],
       filters: filters,
+      sorters: [{
+        property: 'Project',
+        direction: 'ASC'
+      },{
+        property: 'Feature',
+        direction: 'ASC'
+      },{
+        property: 'FormattedID',
+        direction: 'ASC'
+      }],
       listeners: {
         load: function(store, records) {
           deferred.resolve(records);

@@ -14,18 +14,19 @@
   layout: 'border',
   items: [{
     region: 'north',
-    id: 'app-toolbar',
     xtype: 'container',
+    id: 'app-toolbar',
+    layout: 'hbox',
     padding: 5
   },{
     region: 'center',
-    id: 'app-viewport',
     xtype: 'container',
+    id: 'app-viewport',
     layout: 'fit'
   }],
 
   launch: function() {
-    Ext.getCmp('app-toolbar').add({
+    Ext.getCmp('app-toolbar').add([{
       xtype: 'rallycombobox',
       editable: false,
       width: 400,
@@ -34,6 +35,10 @@
         autoLoad: true,
         remoteFilter: true,
         model: 'PortfolioItem/Program',
+        filters: [{
+          property: 'c_ActiveTracking',
+          value: true
+        }],
         sorters: [{
           property: 'Name',
           direction: 'ASC'
@@ -43,74 +48,107 @@
         select: this._onProgramChange,
         scope: this
       }
-    });
+    },{
+      xtype: 'checkbox',
+      id: 'hideAcceptedStories',
+      fieldLabel: 'Hide Accepted Stories',
+      labelWidth: 125,
+      labelAlign: 'right',
+      listeners: {
+        change: this._updateApp,
+        scope: this
+      }
+    }]);
   },
 
   _onProgramChange: function(combobox) {
     this.programRecord = combobox.getRecord();
+    this._updateApp();
+  },
 
+  _updateApp: function() {
+    Ext.getCmp('app-viewport').removeAll();
     Deft.Chain.pipeline([
-      this._getColumnHeaderConfigs,
+      this._getColumnConfigs,
       this._createCardboard,
       this._getCards,
       this._addCardsToBoard
     ], this);
   },
 
-  _getColumnHeaderConfigs: function(combobox) {
+  _getColumnConfigs: function(combobox) {
     var deferred = Ext.create('Deft.Deferred');
+
+    var filters = [{
+      property: 'Parent.ObjectID',
+      value: this.programRecord.get('ObjectID')
+    },{
+      property: 'DirectChildrenCount',
+      operator: '>',
+      value: 0
+    },{
+      property: 'LeafStoryCount',
+      operator: '>',
+      value: 0
+    }];
+
+    if (Ext.getCmp('hideAcceptedStories').checked) {
+      filters.push({
+        property: 'PercentDoneByStoryCount',
+        operator: '!=',
+        value: 1
+      });
+    }
 
     Ext.create('Rally.data.WsapiDataStore', {
       limit: Infinity,
       autoLoad: true,
       model: 'PortfolioItem/ProgramComponent',
       fetch: ['Children'],
-      filters: [{
-        property: 'Parent.ObjectID',
-        value: this.programRecord.get('ObjectID')
-      },{
-        property: 'DirectChildrenCount',
-        operator: '>',
-        value: 0
-      },{
-        property: 'LeafStoryCount',
-        operator: '>',
-        value: 0
+      filters: filters,
+      sorters: [{
+        property: 'Name',
+        direction: 'ASC'
       }],
       listeners: {
         load: function(store, records) {
-          Deft.Promise.all(_.map(records, function(record) {
-            return function() {
-              var deferred = Ext.create('Deft.Deferred');
+          if (records.length > 0) {
+            Deft.Promise.all(_.map(records, function(record) {
+              return function() {
+                var deferred = Ext.create('Deft.Deferred');
 
-              record.getCollection('Children').load({
-                fetch: ['ObjectID'],
-                callback: function(childRecords) {
-                  record.set('Children', _.map(childRecords, function(childRecord) {
-                    return childRecord.get('ObjectID');
-                  }));
-                  deferred.resolve();
-                }
-              });
-
-              return deferred.promise;
-            }();
-          })).then(function() {
-            deferred.resolve(_.map(records, function(programComponentRecord) {
-              return {
-                isMatchingRecord: function(cardRecord) {
-                  return _.contains(programComponentRecord.get('Children'), cardRecord.get('Feature').ObjectID);
-                },
-                cls: 'column-header',
-                value: programComponentRecord.getRef().getRelativeUri(),
-                columnHeaderConfig: {
-                  headerData: {
-                    programComponent: programComponentRecord.get('_refObjectName')
+                record.getCollection('Children').load({
+                  fetch: ['ObjectID'],
+                  callback: function(childRecords) {
+                    record.set('Children', _.map(childRecords, function(childRecord) {
+                      return childRecord.get('ObjectID');
+                    }));
+                    deferred.resolve();
                   }
-                }
-              };
-            }));
-          });
+                });
+
+                return deferred.promise;
+              }();
+            })).then(function() {
+              deferred.resolve(_.map(records, function(programComponentRecord) {
+                return {
+                  isMatchingRecord: function(cardRecord) {
+                    return _.contains(programComponentRecord.get('Children'), cardRecord.get('Feature').ObjectID);
+                  },
+                  columnHeaderConfig: {
+                    headerData: {
+                      programComponent: programComponentRecord.get('_refObjectName')
+                    }
+                  }
+                };
+              }));
+            });
+          } else {
+            Rally.ui.notify.Notifier.showError({
+              message: 'No User Stories match your criteria.',
+              timeout: 2000
+            });
+          }
         }
       }
     });
@@ -118,43 +156,77 @@
     return deferred.promise;
   },
 
-  _createCardboard: function(columnHeaderConfigs) {
-    Ext.getCmp('app-viewport').removeAll();
+  _createCardboard: function(columnConfigs) {
+    var deferred = Ext.create('Deft.Deferred');
+
     Ext.getCmp('app-viewport').add({
       xtype: 'rallycardboard',
       id: 'cardboard',
+      hidden: true,
       context: this.getContext(),
-      types: ['UserStory'],
-      columns: columnHeaderConfigs,
+      readOnly: true,
+      columns: columnConfigs,
       rowConfig: {
         field: 'Project'
       },
       cardConfig: {
-        fields: ['ScheduleState']
+        fields: ['Feature', 'ScheduleState']
       },
       columnConfig: {
         columnHeaderConfig: {
           headerTpl: '{programComponent}'
         }
+      },
+      listeners: {
+        afterrender: function() {
+          deferred.resolve();
+        }
       }
     });
+
+    return deferred.promise;
   },
 
   _getCards: function() {
     var deferred = Ext.create('Deft.Deferred');
     
+    var filters = [{
+      property: 'Feature.Parent.Parent.ObjectID',
+      value: this.programRecord.get('ObjectID')
+    }];
+
+    if (Ext.getCmp('hideAcceptedStories').checked) {
+      filters.push({
+        property: 'ScheduleState',
+        operator: '<',
+        value: 'Accepted'
+      });
+    }
+
     Ext.create('Rally.data.WsapiDataStore', {
       autoLoad: true,
       limit: Infinity,
       model: 'UserStory',
-      fetch: ['Feature', 'Parent', 'Project', 'Name', 'Owner', 'FormattedID', 'ObjectID', 'ScheduleState'],
-      filters: [{
-        property: 'Feature.Parent.Parent.ObjectID',
-        value: this.programRecord.get('ObjectID')
+      fetch: [
+        'Feature',
+        'FormattedID',
+        'Name',
+        'ObjectID',
+        'Owner',
+        'Parent',
+        'Project',
+        'ScheduleState'
+      ],
+      filters: filters,
+      sorters: [{
+        property: 'Project',
+        direction: 'ASC'
       },{
-        property: 'ScheduleState',
-        operator: '<',
-        value: 'Accepted'
+        property: 'Feature',
+        direction: 'ASC'
+      },{
+        property: 'FormattedID',
+        direction: 'ASC'
       }],
       listeners: {
         load: function(store, records) {
@@ -172,6 +244,10 @@
     _.each(cardRecords, function(cardRecord) {
       cardboard.addCard(cardRecord);
     });
+
+    var cardboard = Ext.getCmp('cardboard');
+    cardboard.removeRow(_.last(cardboard.getRows()));
+    cardboard.show();
   }
 });
 
@@ -185,9 +261,15 @@
 
 
     <style type="text/css">
-        .column-header-title {
+        .x-border-layout-ct {
+  background: transparent;
+}
+.column-header-title {
   margin-left: 0 !important;
   margin-right: 0 !important;
+}
+.card-column {
+  vertical-align: bottom !important;
 }
 
     </style>
