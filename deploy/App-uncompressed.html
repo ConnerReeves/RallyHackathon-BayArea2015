@@ -17,7 +17,7 @@
     xtype: 'container',
     id: 'app-toolbar',
     layout: 'hbox',
-    padding: 5
+    padding: '5 5 1 5'
   },{
     region: 'center',
     xtype: 'container',
@@ -166,6 +166,9 @@
       context: this.getContext(),
       readOnly: true,
       columns: columnConfigs,
+      style: {
+        borderTop: '1px dotted gray'
+      },
       rowConfig: {
         field: 'Project'
       },
@@ -193,6 +196,10 @@
     var filters = [{
       property: 'Feature.Parent.Parent.ObjectID',
       value: this.programRecord.get('ObjectID')
+    },{
+      property: 'ScheduleState',
+      operator: '!=',
+      value: 'Incomplete'
     }];
 
     if (Ext.getCmp('hideAcceptedStories').checked) {
@@ -245,7 +252,6 @@
       cardboard.addCard(cardRecord);
     });
 
-    var cardboard = Ext.getCmp('cardboard');
     cardboard.removeRow(_.last(cardboard.getRows()));
     cardboard.show();
   }
@@ -268,7 +274,7 @@
   margin-left: 0 !important;
   margin-right: 0 !important;
 }
-.card-column {
+.column-headers .card-column {
   vertical-align: bottom !important;
 }
 

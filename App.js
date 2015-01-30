@@ -243,7 +243,6 @@ Ext.define('CustomApp', {
       cardboard.addCard(cardRecord);
     });
 
-    var cardboard = Ext.getCmp('cardboard');
     cardboard.removeRow(_.last(cardboard.getRows()));
     cardboard.show();
   }
