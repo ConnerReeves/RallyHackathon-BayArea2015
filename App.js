@@ -187,6 +187,10 @@ Ext.define('CustomApp', {
     var filters = [{
       property: 'Feature.Parent.Parent.ObjectID',
       value: this.programRecord.get('ObjectID')
+    },{
+      property: 'ScheduleState',
+      operator: '!=',
+      value: 'Incomplete'
     }];
 
     if (Ext.getCmp('hideAcceptedStories').checked) {
