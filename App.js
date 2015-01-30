@@ -8,7 +8,7 @@ Ext.define('CustomApp', {
     xtype: 'container',
     id: 'app-toolbar',
     layout: 'hbox',
-    padding: 5
+    padding: '5 5 1 5'
   },{
     region: 'center',
     xtype: 'container',
@@ -157,6 +157,9 @@ Ext.define('CustomApp', {
       context: this.getContext(),
       readOnly: true,
       columns: columnConfigs,
+      style: {
+        borderTop: '1px dotted gray'
+      },
       rowConfig: {
         field: 'Project'
       },

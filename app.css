@@ -7,6 +7,6 @@
   margin-right: 0 !important;
 }
 
-.card-column {
+.column-headers .card-column {
   vertical-align: bottom !important;
 }
