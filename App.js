@@ -172,8 +172,10 @@ Ext.define('CustomApp', {
         }
       },
       listeners: {
-        afterrender: function() {
-          deferred.resolve();
+        aftercolumnrender: function() {
+          _.delay(function() {
+            deferred.resolve();
+          }, 500);
         }
       }
     });
