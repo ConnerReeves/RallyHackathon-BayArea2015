@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>hackathon</title>
+
+    <script type="text/javascript" src="/apps/2.0/sdk.js"></script>
+
+    <script type="text/javascript">
+        Rally.onReady(function () {
+                Ext.define("CustomApp",{extend:"Rally.app.App",componentCls:"app",layout:"border",items:[{region:"north",id:"app-toolbar",xtype:"container",padding:5},{region:"center",id:"app-viewport",xtype:"container",layout:"fit"}],launch:function(){Ext.getCmp("app-toolbar").add({xtype:"rallycombobox",editable:!1,width:400,storeConfig:{limit:1/0,autoLoad:!0,remoteFilter:!0,model:"PortfolioItem/Program",sorters:[{property:"Name",direction:"ASC"}]},listeners:{select:this._onProgramChange,scope:this}})},_onProgramChange:function(combobox){this.programRecord=combobox.getRecord(),Deft.Chain.pipeline([this._getColumnHeaderConfigs,this._createCardboard,this._getCards,this._addCardsToBoard],this)},_getColumnHeaderConfigs:function(combobox){var deferred=Ext.create("Deft.Deferred");return Ext.create("Rally.data.WsapiDataStore",{limit:1/0,autoLoad:!0,model:"PortfolioItem/ProgramComponent",fetch:["Children"],filters:[{property:"Parent.ObjectID",value:this.programRecord.get("ObjectID")},{property:"DirectChildrenCount",operator:">",value:0},{property:"LeafStoryCount",operator:">",value:0}],listeners:{load:function(store,records){Deft.Promise.all(_.map(records,function(record){return function(){var deferred=Ext.create("Deft.Deferred");return record.getCollection("Children").load({fetch:["ObjectID"],callback:function(childRecords){record.set("Children",_.map(childRecords,function(childRecord){return childRecord.get("ObjectID")})),deferred.resolve()}}),deferred.promise}()})).then(function(){deferred.resolve(_.map(records,function(programComponentRecord){return{isMatchingRecord:function(cardRecord){return _.contains(programComponentRecord.get("Children"),cardRecord.get("Feature").ObjectID)},cls:"column-header",value:programComponentRecord.getRef().getRelativeUri(),columnHeaderConfig:{headerData:{programComponent:programComponentRecord.get("_refObjectName")}}}}))})}}}),deferred.promise},_createCardboard:function(columnHeaderConfigs){Ext.getCmp("app-viewport").removeAll(),Ext.getCmp("app-viewport").add({xtype:"rallycardboard",id:"cardboard",context:this.getContext(),types:["UserStory"],columns:columnHeaderConfigs,rowConfig:{field:"Project"},cardConfig:{fields:["ScheduleState"]},columnConfig:{columnHeaderConfig:{headerTpl:"{programComponent}"}}})},_getCards:function(){var deferred=Ext.create("Deft.Deferred");return Ext.create("Rally.data.WsapiDataStore",{autoLoad:!0,limit:1/0,model:"UserStory",fetch:["Feature","Parent","Project","Name","Owner","FormattedID","ObjectID","ScheduleState"],filters:[{property:"Feature.Parent.Parent.ObjectID",value:this.programRecord.get("ObjectID")},{property:"ScheduleState",operator:"<",value:"Accepted"}],listeners:{load:function(store,records){deferred.resolve(records)}}}),deferred.promise},_addCardsToBoard:function(cardRecords){var cardboard=Ext.getCmp("cardboard");_.each(cardRecords,function(cardRecord){cardboard.addCard(cardRecord)})}});
+
+            Rally.launchApp('CustomApp', {
+                name:"hackathon",
+	            parentRepos:""
+            });
+
+        });
+    </script>
+
+
+    <style type="text/css">
+        .column-header-title{margin-left:0 !important;margin-right:0 !important}
+    </style>
+</head>
+<body>
+</body>
+</html>
